@@ -1,12 +1,6 @@
-{
-  self,
-  steam-fetcher,
-}: {
-  config,
-  pkgs,
-  lib,
-  ...
-}: let
+{ self, steam-fetcher, }:
+{ config, pkgs, lib, ... }:
+let
   cfg = config.services.valheim;
   stateDir = "/var/lib/valheim";
 in {
@@ -62,23 +56,16 @@ in {
     };
 
     password = lib.mkOption {
-      type = lib.types.str;
-      default = "";
+      type = lib.types.path;
       description = lib.mdDoc ''
-        The server password.
-
-        This can only be passed as a commandline argument to the server, so it
-        can be viewed by any user on the system able to list processes.
+        The server password file.
       '';
     };
 
     adminList = lib.mkOption {
       type = with lib.types; listOf str;
-      default = [];
-      example = [
-        "72057602627862526"
-        "72057602627862527"
-      ];
+      default = [ ];
+      example = [ "72057602627862526" "72057602627862527" ];
       description = lib.mdDoc ''
         List of Steam IDs to be added to the adminlist.txt file.
 
@@ -88,11 +75,8 @@ in {
 
     permittedList = lib.mkOption {
       type = with lib.types; listOf str;
-      default = [];
-      example = [
-        "72057602627862526"
-        "72057602627862527"
-      ];
+      default = [ ];
+      example = [ "72057602627862526" "72057602627862527" ];
       description = lib.mdDoc ''
         List of Steam IDs to be added to the permittedlist.txt file.
 
@@ -100,14 +84,11 @@ in {
         If you use this, all players not on the list will be unable to join.
       '';
     };
-    
+
     bannedList = lib.mkOption {
       type = with lib.types; listOf str;
-      default = [];
-      example = [
-        "72057602627862526"
-        "72057602627862527"
-      ];
+      default = [ ];
+      example = [ "72057602627862526" "72057602627862527" ];
       description = lib.mdDoc ''
         List of Steam IDs to be added to the bannedlist.txt file.
 
@@ -117,7 +98,7 @@ in {
 
     bepinexMods = lib.mkOption {
       type = with lib; types.listOf types.package;
-      default = [];
+      default = [ ];
       description = "BepInEx mods to install.";
       example = lib.types.literalExpression ''
         [
@@ -133,7 +114,7 @@ in {
 
     bepinexConfigs = lib.mkOption {
       type = with lib; types.listOf types.path;
-      default = [];
+      default = [ ];
       description = ''
         Config files for BepInEx mods.
 
@@ -149,7 +130,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    nixpkgs.overlays = [self.overlays.default steam-fetcher.overlays.default];
+    nixpkgs.overlays = [ self.overlays.default steam-fetcher.overlays.default ];
 
     users = {
       users.valheim = {
@@ -158,17 +139,16 @@ in {
         home = stateDir;
         createHome = true;
       };
-      groups.valheim = {};
+      groups.valheim = { };
     };
 
-    systemd.services = let
-      installDir = "${stateDir}/valheim-server-modded";
+    systemd.services = let installDir = "${stateDir}/valheim-server-modded";
     in {
       valheim = {
         description = "Valheim dedicated server";
-        requires = ["network.target"];
-        after = ["network.target"];
-        wantedBy = ["multi-user.target"];
+        requires = [ "network.target" ];
+        after = [ "network.target" ];
+        wantedBy = [ "multi-user.target" ];
 
         preStart = let
           mods = pkgs.symlinkJoin {
@@ -181,55 +161,52 @@ in {
                 "$out"/manifest.json
             '';
           };
-          modConfigs =
-            pkgs.runCommandLocal "valheim-bepinex-configs" {
-              configs = cfg.bepinexConfigs;
-            } ''
-              mkdir "$out"
-              for cfg in $configs; do
-                cp $cfg $out/$(stripHash $cfg)
-              done
-            '';
-          createListFile = name: list: ''
-              echo "// List of Steam IDs for ${name} ONE per line
-              ${lib.strings.concatStringsSep "\n" list}" > ${stateDir}/.config/unity3d/IronGate/Valheim/${name}
-              chown valheim:valheim ${stateDir}/.config/unity3d/IronGate/Valheim/${name}
-            '';
-        in
-          ''
-            mkdir -p ${stateDir}/.config/unity3d/IronGate/Valheim
-            ${createListFile "adminlist.txt" cfg.adminList}
-            ${createListFile "permittedlist.txt" cfg.permittedList}
-            ${createListFile "bannedlist.txt" cfg.bannedList}
-          ''
-          + lib.optionalString (cfg.bepinexMods != []) ''
-            if [ -e ${installDir} ]; then
-              chmod -R +w ${installDir}
-              rm -rf ${installDir}
-            fi
-            mkdir ${installDir}
-            cp -r \
-              ${pkgs.valheim-server-unwrapped}/* \
-              ${pkgs.valheim-bepinex-pack}/* \
-              ${installDir}
-
-            # BepInEx doesn't like read-only files.
-            chmod -R u+w ${installDir}
-          ''
-          + lib.optionalString (cfg.bepinexMods != []) ''
-            # Install extra mods.
-            cp -rL "${mods}"/. ${installDir}/BepInEx/plugins/
-
-            # BepInEx *really* doesn't like *any* read-only files.
-            chmod -R u+w ${installDir}/BepInEx/plugins/
-          ''
-          + lib.optionalString (cfg.bepinexConfigs != []) ''
-            # Install extra mod configs.
-            cp -r ${modConfigs}/. ${installDir}/BepInEx/config/
-
-            # BepInEx *really* doesn't like *any* read-only files.
-            chmod -R u+w ${installDir}/BepInEx/config/
+          modConfigs = pkgs.runCommandLocal "valheim-bepinex-configs" {
+            configs = cfg.bepinexConfigs;
+          } ''
+            mkdir "$out"
+            for cfg in $configs; do
+              cp $cfg $out/$(stripHash $cfg)
+            done
           '';
+          createListFile = name: list: ''
+            echo "// List of Steam IDs for ${name} ONE per line
+            ${
+              lib.strings.concatStringsSep "\n" list
+            }" > ${stateDir}/.config/unity3d/IronGate/Valheim/${name}
+            chown valheim:valheim ${stateDir}/.config/unity3d/IronGate/Valheim/${name}
+          '';
+        in ''
+          mkdir -p ${stateDir}/.config/unity3d/IronGate/Valheim
+          ${createListFile "adminlist.txt" cfg.adminList}
+          ${createListFile "permittedlist.txt" cfg.permittedList}
+          ${createListFile "bannedlist.txt" cfg.bannedList}
+        '' + lib.optionalString (cfg.bepinexMods != [ ]) ''
+          if [ -e ${installDir} ]; then
+            chmod -R +w ${installDir}
+            rm -rf ${installDir}
+          fi
+          mkdir ${installDir}
+          cp -r \
+            ${pkgs.valheim-server-unwrapped}/* \
+            ${pkgs.valheim-bepinex-pack}/* \
+            ${installDir}
+
+          # BepInEx doesn't like read-only files.
+          chmod -R u+w ${installDir}
+        '' + lib.optionalString (cfg.bepinexMods != [ ]) ''
+          # Install extra mods.
+          cp -rL "${mods}"/. ${installDir}/BepInEx/plugins/
+
+          # BepInEx *really* doesn't like *any* read-only files.
+          chmod -R u+w ${installDir}/BepInEx/plugins/
+        '' + lib.optionalString (cfg.bepinexConfigs != [ ]) ''
+          # Install extra mod configs.
+          cp -r ${modConfigs}/. ${installDir}/BepInEx/config/
+
+          # BepInEx *really* doesn't like *any* read-only files.
+          chmod -R u+w ${installDir}/BepInEx/config/
+        '';
 
         serviceConfig = let
           valheimBepInExFHSEnvWrapper = pkgs.buildFHSUserEnv {
@@ -264,21 +241,19 @@ in {
           Type = "exec";
           User = "valheim";
           ExecStart = let
-            valheimServerPkg =
-              if (cfg.bepinexMods != [])
-              then valheimBepInExFHSEnvWrapper
-              else pkgs.valheim-server;
-          in
-            lib.strings.concatStringsSep " " ([
-                "${valheimServerPkg}/bin/valheim-server"
-                "-name \"${cfg.serverName}\""
-              ]
-              ++ (lib.lists.optional (cfg.worldName != null) "-world \"${cfg.worldName}\"")
-              ++ [
-                "-port \"${builtins.toString cfg.port}\""
-                "-password \"${cfg.password}\""
-              ]
-              ++ (lib.lists.optional cfg.crossplay "-crossplay"));
+            valheimServerPkg = if (cfg.bepinexMods != [ ]) then
+              valheimBepInExFHSEnvWrapper
+            else
+              pkgs.valheim-server;
+            serverCmd = lib.strings.concatStringsSep " " ([
+              "${valheimServerPkg}/bin/valheim-server"
+              ''-name "${cfg.serverName}"''
+            ] ++ (lib.lists.optional (cfg.worldName != null)
+              ''-world "${cfg.worldName}"'') ++ [
+                ''-port "${builtins.toString cfg.port}"''
+                ''-password "$(cat ${cfg.password})"''
+              ] ++ (lib.lists.optional cfg.crossplay "-crossplay"));
+          in "${pkgs.bash} -c '${serverCmd}'";
         };
       };
     };
