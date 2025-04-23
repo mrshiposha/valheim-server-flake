@@ -253,7 +253,7 @@ in {
                 ''-port "${builtins.toString cfg.port}"''
                 ''-password "$(cat ${cfg.password})"''
               ] ++ (lib.lists.optional cfg.crossplay "-crossplay"));
-          in "${pkgs.bash} -c '${serverCmd}'";
+          in "${pkgs.bash}/bin/bash -c '${serverCmd}'";
         };
       };
     };
