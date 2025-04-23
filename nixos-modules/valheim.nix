@@ -59,6 +59,9 @@ in {
       type = lib.types.path;
       description = lib.mdDoc ''
         The server password file.
+
+        This can only be passed as a commandline argument to the server, so it
+        can be viewed by any user on the system able to list processes.
       '';
     };
 
